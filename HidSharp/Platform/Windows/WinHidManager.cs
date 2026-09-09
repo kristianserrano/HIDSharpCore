@@ -152,10 +152,13 @@ namespace HidSharp.Platform.Windows
 #endif
         protected override void Run(Action readyCallback)
         {
-            const string className = "HidSharpDeviceMonitor";
+            var assemblyName = typeof(WinHidManager).Assembly.GetName();
+            string className = "HidSharpDeviceMonitor-" + assemblyName.Name + "-" + assemblyName.Version + "-" + Guid.NewGuid().ToString("N");
+
+            var instance = NativeMethods.GetModuleHandle(null);
 
             NativeMethods.WindowProc windowProc = DeviceMonitorWindowProc;
-            var wc = new NativeMethods.WNDCLASS() { ClassName = className, WindowProc = windowProc };
+            var wc = new NativeMethods.WNDCLASS() { ClassName = className, WindowProc = windowProc, Instance = instance };
             RunAssert(0 != NativeMethods.RegisterClass(ref wc), "HidSharp RegisterClass failed.");
 
             var hwnd = NativeMethods.CreateWindowEx(0, className, className, 0,
@@ -233,7 +236,7 @@ namespace HidSharp.Platform.Windows
 #endif
 
             RunAssert(NativeMethods.DestroyWindow(hwnd), "HidSharp DestroyWindow failed.");
-            RunAssert(NativeMethods.UnregisterClass(className, IntPtr.Zero), "HidSharp UnregisterClass failed.");
+            RunAssert(NativeMethods.UnregisterClass(className, instance), "HidSharp UnregisterClass failed.");
             GC.KeepAlive(windowProc);
         }
 

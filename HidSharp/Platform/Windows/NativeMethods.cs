@@ -993,6 +993,9 @@ namespace HidSharp.Platform.Windows
         [DllImport("user32.dll")]
         public static extern ushort RegisterClass(ref WNDCLASS windowClass);
 
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        public static extern IntPtr GetModuleHandle(string lpModuleName);
+
         public const int CW_USEDEFAULT = unchecked((int)0x80000000);
         public static readonly IntPtr HWND_MESSAGE = (IntPtr)(-3);
         [DllImport("user32.dll", CharSet = CharSet.Auto)]
