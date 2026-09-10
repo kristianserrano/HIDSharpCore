@@ -75,9 +75,26 @@ namespace HidSharp.Platform
             readyCallback();
         }
 
+        internal Exception RunException { get; private set; }
+
         internal void RunImpl(object readyEvent)
         {
-            Run(() => ((ManualResetEvent)readyEvent).Set());
+            var manualResetEvent = (ManualResetEvent)readyEvent;
+            try
+            {
+                Run(() => manualResetEvent.Set());
+            }
+            catch (Exception ex)
+            {
+                // Run() executes on a background thread we started. An exception here is
+                // otherwise unhandled and fatal to the entire host process, regardless of
+                // what caused it -- no caller's try/catch can intercept it, since it never
+                // occurs on their call stack. Capture it and let HidSelector's static
+                // constructor rethrow it on the caller's thread instead, where it becomes an
+                // ordinary catchable exception (wrapped in TypeInitializationException).
+                RunException = ex;
+                manualResetEvent.Set();
+            }
         }
 
         protected static void RunAssert(bool condition, string error)

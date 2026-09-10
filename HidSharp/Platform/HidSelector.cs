@@ -15,6 +15,7 @@
    under the License. */
 #endregion
 
+using System.Runtime.ExceptionServices;
 using System.Threading;
 
 namespace HidSharp.Platform
@@ -43,6 +44,18 @@ namespace HidSharp.Platform
                     ManagerThread = new Thread(Instance.RunImpl) { IsBackground = true, Name = "HID Manager" };
                     ManagerThread.Start(readyEvent);
                     readyEvent.WaitOne();
+
+                    if (Instance.RunException != null)
+                    {
+                        // Rethrow on this (the caller's) thread instead of leaving it fatal on
+                        // the background thread. The CLR wraps this in a TypeInitializationException
+                        // for every caller, so HID support becomes unavailable (a catchable failure)
+                        // instead of taking down the whole host process.
+                        var runException = Instance.RunException;
+                        Instance = null;
+                        ExceptionDispatchInfo.Capture(runException).Throw();
+                    }
+
                     break;
                 }
             }
