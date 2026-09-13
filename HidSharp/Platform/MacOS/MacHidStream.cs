@@ -34,6 +34,7 @@ namespace HidSharp.Platform.MacOS
         IntPtr _readRunLoop;
         Thread _readThread, _writeThread;
         volatile bool _shutdown;
+        volatile bool _readRunLoopRunning;
 
         internal MacHidStream(MacHidDevice device)
             : base(device)
@@ -102,8 +103,22 @@ namespace HidSharp.Platform.MacOS
 
             while (true)
             {
-                var runLoop = _readRunLoop;
-                if (runLoop != IntPtr.Zero) { NativeMethods.CFRunLoopStop(runLoop); }
+                // Only signal a run loop we know is still actually running.
+                // Once ReadThread's own finally block has cleared this flag,
+                // the OS thread is on its way out (or already gone), and its
+                // per-thread CFRunLoop can be torn down by the OS the moment
+                // the thread exits — calling CFRunLoopStop on that stale
+                // handle after the fact hands CoreFoundation a pointer that's
+                // no longer a CFRunLoopRef, which trips its internal type
+                // assertion and aborts the process (SIGILL,
+                // _CFAssertMismatchedTypeID). Confirmed via a real
+                // LogiPluginService crash whose faulting thread was exactly
+                // this Dispose loop calling CFRunLoopStop.
+                if (_readRunLoopRunning)
+                {
+                    var runLoop = _readRunLoop;
+                    if (runLoop != IntPtr.Zero) { NativeMethods.CFRunLoopStop(runLoop); }
+                }
 
                 try
                 {
@@ -170,7 +185,15 @@ namespace HidSharp.Platform.MacOS
                                                                   inputCallback, IntPtr.Zero);
                     NativeMethods.IOHIDDeviceRegisterRemovalCallback(_handle, removalCallback, IntPtr.Zero);
                     NativeMethods.IOHIDDeviceScheduleWithRunLoop(_handle, _readRunLoop, NativeMethods.kCFRunLoopDefaultMode);
+                    _readRunLoopRunning = true;
                     NativeMethods.CFRunLoopRun();
+                    // Cleared before doing anything else post-run: Dispose's
+                    // loop polls this flag to decide whether _readRunLoop is
+                    // still safe to pass to CFRunLoopStop, so it must go
+                    // false before this thread does anything that could let
+                    // the OS start tearing the thread (and its per-thread
+                    // CFRunLoop) down.
+                    _readRunLoopRunning = false;
                     NativeMethods.IOHIDDeviceUnscheduleFromRunLoop(_handle, _readRunLoop, NativeMethods.kCFRunLoopDefaultMode);
                 }
 
@@ -181,6 +204,7 @@ namespace HidSharp.Platform.MacOS
             }
             finally
             {
+                _readRunLoopRunning = false;
                 HandleRelease();
             }
         }
