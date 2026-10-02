@@ -102,13 +102,18 @@ namespace HidSharp.Platform.MacOS
             }
 
             // Make the key of every entry that shares its path with another unique
-            // (see NativeMethods.MakeUniqueKey); paths that are already unique are
-            // left exactly as they were.
+            // (see NativeMethods.MakeUniqueKey). IOHIDUserDevice paths (Bluetooth LE
+            // HID devices) always get one, even while only one is connected: the
+            // path is shared by every such device, so a key that gained or lost its
+            // suffix whenever a second one connected or went away would look like
+            // that device vanishing and reappearing. Other paths that are already
+            // unique are left exactly as they were, so USB keys do not change.
             var keys = new object[paths.Count];
             for (int i = 0; i < paths.Count; i++)
             {
-                bool shared = entryIds[i] != 0 && paths.Count(other => other == paths[i]) > 1;
-                keys[i] = shared ? NativeMethods.MakeUniqueKey(paths[i], entryIds[i]) : paths[i];
+                bool needsEntryId = entryIds[i] != 0
+                    && (paths[i].EndsWith("/IOHIDUserDevice", StringComparison.Ordinal) || paths.Count(other => other == paths[i]) > 1);
+                keys[i] = needsEntryId ? NativeMethods.MakeUniqueKey(paths[i], entryIds[i]) : paths[i];
             }
 
             return keys;
