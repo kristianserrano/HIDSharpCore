@@ -50,7 +50,7 @@ namespace HidSharp.Platform.MacOS
             IntPtr handle; int retryCount = 0, maxRetries = 10;
             while (true)
             {
-                using (var service = NativeMethods.IORegistryEntryCopyFromPath(0, path).ToIOObject())
+                using (var service = NativeMethods.CopyRegistryEntryFromKey(0, path).ToIOObject())
                 {
                     string error;
 

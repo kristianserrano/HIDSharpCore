@@ -70,6 +70,7 @@ namespace HidSharp.Platform.MacOS
         object[] GetDeviceKeys(string kind)
         {
             var paths = new List<string>();
+            var entryIds = new List<ulong>();
 
             var matching = NativeMethods.IOServiceMatching(kind).ToCFType(); // Consumed by IOServiceGetMatchingServices, so DON'T Dispose().
             if (matching.IsSet)
@@ -90,6 +91,8 @@ namespace HidSharp.Platform.MacOS
                                     if (cfPath.IsSet)
                                     {
                                         paths.Add(NativeMethods.CFStringGetCharacters(cfPath));
+                                        ulong entryId;
+                                        entryIds.Add(NativeMethods.IOReturn.Success == NativeMethods.IORegistryEntryGetRegistryEntryID(handle, out entryId) ? entryId : 0);
                                     }
                                 }
                             }
@@ -98,7 +101,17 @@ namespace HidSharp.Platform.MacOS
                 }
             }
 
-            return paths.Cast<object>().ToArray();
+            // Make the key of every entry that shares its path with another unique
+            // (see NativeMethods.MakeUniqueKey); paths that are already unique are
+            // left exactly as they were.
+            var keys = new object[paths.Count];
+            for (int i = 0; i < paths.Count; i++)
+            {
+                bool shared = entryIds[i] != 0 && paths.Count(other => other == paths[i]) > 1;
+                keys[i] = shared ? NativeMethods.MakeUniqueKey(paths[i], entryIds[i]) : paths[i];
+            }
+
+            return keys;
         }
 
         protected override object[] GetBleDeviceKeys()

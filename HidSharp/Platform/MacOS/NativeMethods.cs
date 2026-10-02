@@ -740,6 +740,41 @@ namespace HidSharp.Platform.MacOS
             }
         }
 
+        [DllImport(IOKit, EntryPoint = "IORegistryEntryGetRegistryEntryID")]
+        public static extern IOReturn IORegistryEntryGetRegistryEntryID(int entry, out ulong entryID);
+
+        [DllImport(IOKit, EntryPoint = "IORegistryEntryIDMatching")]
+        public static extern IntPtr IORegistryEntryIDMatching(ulong entryID);
+
+        // Consumes the matching dictionary, like IOServiceGetMatchingServices.
+        [DllImport(IOKit, EntryPoint = "IOServiceGetMatchingService")]
+        public static extern int IOServiceGetMatchingService(int masterPort, IntPtr matching);
+
+        // Several registry entries can share one IOService path (for example every
+        // IOHIDUserDevice, which is how Bluetooth LE HID devices appear, is named
+        // "...IOHIDResourceDeviceUserClient/IOHIDUserDevice"), and
+        // IORegistryEntryCopyFromPath then resolves only one of them. A device key
+        // for such an entry is "<path>?entryID=<id>" and is resolved by its registry
+        // entry ID; any other key is a plain path.
+        const string EntryIdSeparator = "?entryID=";
+
+        public static string MakeUniqueKey(string path, ulong entryID)
+        {
+            return path + EntryIdSeparator + entryID.ToString();
+        }
+
+        public static int CopyRegistryEntryFromKey(uint masterPort, string key)
+        {
+            int separator = key.LastIndexOf(EntryIdSeparator, StringComparison.Ordinal);
+            if (separator >= 0 && ulong.TryParse(key.Substring(separator + EntryIdSeparator.Length), out ulong entryID))
+            {
+                var matching = IORegistryEntryIDMatching(entryID);
+                return matching == IntPtr.Zero ? 0 : IOServiceGetMatchingService((int)masterPort, matching);
+            }
+
+            return IORegistryEntryCopyFromPath(masterPort, key);
+        }
+
         [DllImport(IOKit, EntryPoint = "IORegistryEntryCopyPath")]
         public static extern IntPtr IORegistryEntryCopyPath(int entry, [MarshalAs(UnmanagedType.LPStr)] string plane);
 
