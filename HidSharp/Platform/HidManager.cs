@@ -75,9 +75,25 @@ namespace HidSharp.Platform
             readyCallback();
         }
 
+        internal Exception RunException { get; private set; }
+
         internal void RunImpl(object readyEvent)
         {
-            Run(() => ((ManualResetEvent)readyEvent).Set());
+            var ready = (ManualResetEvent)readyEvent;
+            try
+            {
+                Run(() => ready.Set());
+            }
+            catch (Exception ex)
+            {
+                // After the ready signal there is nobody to hand the exception to.
+                if (ready.WaitOne(0)) { throw; }
+
+                // Run() is on a thread we started, so an exception would be fatal to the
+                // process. HidSelector rethrows it on the caller's thread instead.
+                RunException = ex;
+                ready.Set();
+            }
         }
 
         protected static void RunAssert(bool condition, string error)

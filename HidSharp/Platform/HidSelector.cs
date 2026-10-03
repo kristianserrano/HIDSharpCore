@@ -15,6 +15,7 @@
    under the License. */
 #endregion
 
+using System;
 using System.Threading;
 
 namespace HidSharp.Platform
@@ -43,6 +44,15 @@ namespace HidSharp.Platform
                     ManagerThread = new Thread(Instance.RunImpl) { IsBackground = true, Name = "HID Manager" };
                     ManagerThread.Start(readyEvent);
                     readyEvent.WaitOne();
+
+                    if (Instance.RunException != null)
+                    {
+                        // Surfaces as a TypeInitializationException on the caller's thread.
+                        var runException = Instance.RunException;
+                        Instance = null;
+                        throw new InvalidOperationException("HidSharp failed to initialize.", runException);
+                    }
+
                     break;
                 }
             }
