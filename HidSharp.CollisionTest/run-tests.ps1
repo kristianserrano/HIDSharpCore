@@ -11,7 +11,7 @@ $crash = -532462766
 function Run-Scenario($scenario) {
     Write-Host ""
     Write-Host "=== $scenario ===" -ForegroundColor Cyan
-    & dotnet $dll $scenario
+    & dotnet $dll $scenario | Out-Host
     return $LASTEXITCODE
 }
 
