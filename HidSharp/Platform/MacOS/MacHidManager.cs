@@ -70,6 +70,7 @@ namespace HidSharp.Platform.MacOS
         object[] GetDeviceKeys(string kind)
         {
             var paths = new List<string>();
+            var entryIds = new List<ulong>();
 
             var matching = NativeMethods.IOServiceMatching(kind).ToCFType(); // Consumed by IOServiceGetMatchingServices, so DON'T Dispose().
             if (matching.IsSet)
@@ -90,6 +91,8 @@ namespace HidSharp.Platform.MacOS
                                     if (cfPath.IsSet)
                                     {
                                         paths.Add(NativeMethods.CFStringGetCharacters(cfPath));
+                                        ulong entryId;
+                                        entryIds.Add(NativeMethods.IOReturn.Success == NativeMethods.IORegistryEntryGetRegistryEntryID(handle, out entryId) ? entryId : 0);
                                     }
                                 }
                             }
@@ -98,7 +101,17 @@ namespace HidSharp.Platform.MacOS
                 }
             }
 
-            return paths.Cast<object>().ToArray();
+            // Entries that share a path get an entry-ID key (see NativeMethods.MakeUniqueKey).
+            // IOHIDUserDevice (Bluetooth LE) always does, so keys stay stable as others come and go.
+            var keys = new object[paths.Count];
+            for (int i = 0; i < paths.Count; i++)
+            {
+                bool needsEntryId = entryIds[i] != 0
+                    && (paths[i].EndsWith("/IOHIDUserDevice", StringComparison.Ordinal) || paths.Count(other => other == paths[i]) > 1);
+                keys[i] = needsEntryId ? NativeMethods.MakeUniqueKey(paths[i], entryIds[i]) : paths[i];
+            }
+
+            return keys;
         }
 
         protected override object[] GetBleDeviceKeys()

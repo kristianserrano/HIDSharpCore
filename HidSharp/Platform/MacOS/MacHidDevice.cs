@@ -43,7 +43,7 @@ namespace HidSharp.Platform.MacOS
         {
             var d = new MacHidDevice() { _path = path };
 
-            var service = NativeMethods.IORegistryEntryCopyFromPath(0, path).ToIOObject();
+            var service = NativeMethods.CopyRegistryEntryFromKey(0, path).ToIOObject();
             if (!service.IsSet) { return null; }
 
             using (service)
@@ -279,7 +279,7 @@ namespace HidSharp.Platform.MacOS
             }
 
             // Determine USB device from HID path
-            var hidEntry = NativeMethods.IORegistryEntryCopyFromPath(masterPort, _path).ToIOObject();
+            var hidEntry = NativeMethods.CopyRegistryEntryFromKey(masterPort, _path).ToIOObject();
 
             int deviceEntry = 0;
 

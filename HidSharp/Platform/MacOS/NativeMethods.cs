@@ -740,6 +740,38 @@ namespace HidSharp.Platform.MacOS
             }
         }
 
+        [DllImport(IOKit, EntryPoint = "IORegistryEntryGetRegistryEntryID")]
+        public static extern IOReturn IORegistryEntryGetRegistryEntryID(int entry, out ulong entryID);
+
+        [DllImport(IOKit, EntryPoint = "IORegistryEntryIDMatching")]
+        public static extern IntPtr IORegistryEntryIDMatching(ulong entryID);
+
+        // Consumes the matching dictionary, like IOServiceGetMatchingServices.
+        [DllImport(IOKit, EntryPoint = "IOServiceGetMatchingService")]
+        public static extern int IOServiceGetMatchingService(int masterPort, IntPtr matching);
+
+        // Registry entries can share an IOService path (e.g. every IOHIDUserDevice), and
+        // IORegistryEntryCopyFromPath resolves only one of them. Such entries use the key
+        // "<path>?entryID=<id>" and are resolved by registry entry ID; other keys are plain paths.
+        const string EntryIdSeparator = "?entryID=";
+
+        public static string MakeUniqueKey(string path, ulong entryID)
+        {
+            return path + EntryIdSeparator + entryID.ToString();
+        }
+
+        public static int CopyRegistryEntryFromKey(uint masterPort, string key)
+        {
+            int separator = key.LastIndexOf(EntryIdSeparator, StringComparison.Ordinal);
+            if (separator >= 0 && ulong.TryParse(key.Substring(separator + EntryIdSeparator.Length), out ulong entryID))
+            {
+                var matching = IORegistryEntryIDMatching(entryID);
+                return matching == IntPtr.Zero ? 0 : IOServiceGetMatchingService((int)masterPort, matching);
+            }
+
+            return IORegistryEntryCopyFromPath(masterPort, key);
+        }
+
         [DllImport(IOKit, EntryPoint = "IORegistryEntryCopyPath")]
         public static extern IntPtr IORegistryEntryCopyPath(int entry, [MarshalAs(UnmanagedType.LPStr)] string plane);
 
