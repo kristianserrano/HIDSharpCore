@@ -34,6 +34,7 @@ namespace HidSharp.Platform.MacOS
         IntPtr _readRunLoop;
         Thread _readThread, _writeThread;
         volatile bool _shutdown;
+        volatile bool _readRunLoopRunning;
 
         internal MacHidStream(MacHidDevice device)
             : base(device)
@@ -102,8 +103,14 @@ namespace HidSharp.Platform.MacOS
 
             while (true)
             {
-                var runLoop = _readRunLoop;
-                if (runLoop != IntPtr.Zero) { NativeMethods.CFRunLoopStop(runLoop); }
+                // Only stop a run loop that is still running: once the read thread exits,
+                // the OS can free its CFRunLoop and CFRunLoopStop on the stale pointer aborts.
+                // A small race remains if the loop exits between this check and the call.
+                if (_readRunLoopRunning)
+                {
+                    var runLoop = _readRunLoop;
+                    if (runLoop != IntPtr.Zero) { NativeMethods.CFRunLoopStop(runLoop); }
+                }
 
                 try
                 {
@@ -170,7 +177,10 @@ namespace HidSharp.Platform.MacOS
                                                                   inputCallback, IntPtr.Zero);
                     NativeMethods.IOHIDDeviceRegisterRemovalCallback(_handle, removalCallback, IntPtr.Zero);
                     NativeMethods.IOHIDDeviceScheduleWithRunLoop(_handle, _readRunLoop, NativeMethods.kCFRunLoopDefaultMode);
+                    _readRunLoopRunning = true;
                     NativeMethods.CFRunLoopRun();
+                    // Clear before the thread can exit; Dispose checks this before CFRunLoopStop.
+                    _readRunLoopRunning = false;
                     NativeMethods.IOHIDDeviceUnscheduleFromRunLoop(_handle, _readRunLoop, NativeMethods.kCFRunLoopDefaultMode);
                 }
 
@@ -181,6 +191,7 @@ namespace HidSharp.Platform.MacOS
             }
             finally
             {
+                _readRunLoopRunning = false;
                 HandleRelease();
             }
         }
