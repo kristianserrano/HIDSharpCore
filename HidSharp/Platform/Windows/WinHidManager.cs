@@ -152,7 +152,10 @@ namespace HidSharp.Platform.Windows
 #endif
         protected override void Run(Action readyCallback)
         {
-            const string className = "HidSharpDeviceMonitor";
+            // Unique per instance: a window class name must not collide with another
+            // HidSharp copy (or another instance of this one) in the same process.
+            var assemblyName = typeof(WinHidManager).Assembly.GetName();
+            string className = "HidSharpDeviceMonitor-" + assemblyName.Name + "-" + assemblyName.Version + "-" + Guid.NewGuid().ToString("N");
 
             NativeMethods.WindowProc windowProc = DeviceMonitorWindowProc;
             var wc = new NativeMethods.WNDCLASS() { ClassName = className, WindowProc = windowProc };
