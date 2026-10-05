@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>HidSharp.CollisionTest</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Stock HidSharp 2.1.0 (what the Logi Plugin SDK bundles). Not referenced at compile
+         time; the DLL is only copied next to the test app and loaded at runtime. -->
+    <PackageReference Include="HidSharp" Version="2.1.0" GeneratePathProperty="true" ExcludeAssets="compile;runtime" />
+
+    <!-- The patched HidSharp built from this repository, also loaded at runtime only. -->
+    <ProjectReference Include="..\HidSharp\HidSharp.NETStandard.csproj" ReferenceOutputAssembly="false" OutputItemType="PatchedHidSharp" />
+  </ItemGroup>
+
+  <Target Name="CopyHidSharpCopies" AfterTargets="Build">
+    <Copy SourceFiles="$(PkgHidSharp)\lib\netstandard2.0\HidSharp.dll" DestinationFolder="$(OutDir)stock" />
+    <Copy SourceFiles="@(PatchedHidSharp)" DestinationFolder="$(OutDir)patched" />
+  </Target>
+
+</Project>
